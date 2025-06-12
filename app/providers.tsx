@@ -1,0 +1,15 @@
+"use client"
+
+import { ThemeProvider } from "next-themes" // Assuming next-themes for theme
+import { AuthProvider } from "@/lib/auth-context" // Your AuthProvider
+
+export function Providers({ children }: { children: React.ReactNode }) {
+  return (
+    // Assuming ThemeProvider is from next-themes
+    <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
+      <AuthProvider>
+        {children}
+      </AuthProvider>
+    </ThemeProvider>
+  )
+} 
