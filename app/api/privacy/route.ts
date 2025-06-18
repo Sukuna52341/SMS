@@ -8,6 +8,7 @@ interface PrivacySettingsUpdate {
   marketingConsent: boolean
   dataSharing: boolean
   anonymousAnalytics: boolean
+  profileVisibility: "public" | "private" | "friends_only"
 }
 
 export async function GET(request: NextRequest) {
@@ -130,14 +131,15 @@ export async function PUT(request: NextRequest) {
     // Validate settings structure
     if (typeof settings.marketingConsent !== 'boolean' ||
         typeof settings.dataSharing !== 'boolean' ||
-        typeof settings.anonymousAnalytics !== 'boolean') {
+        typeof settings.anonymousAnalytics !== 'boolean' ||
+        !["public", "private", "friends_only"].includes(settings.profileVisibility)) {
       return NextResponse.json(
         { error: "Invalid settings format" }, 
         { status: 400 }
       )
     }
 
-    // Update privacy settings in the database
+    // Update privacy settings in the database (implement DB logic here)
     // await updatePrivacySettings(user.id, settings)
 
     // Server-side audit log with all required fields

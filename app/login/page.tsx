@@ -54,7 +54,17 @@ export default function LoginPage() {
       // If no 2FA required, proceed with normal login
       const success = await login(email, password)
       if (success) {
-        router.push("/dashboard")
+        // Redirect based on role
+        const user = JSON.parse(localStorage.getItem("user") || '{}');
+        if (user.role === "admin") {
+          router.push("/admin");
+        } else if (user.role === "staff") {
+          router.push("/dashboard");
+        } else if (user.role === "customer") {
+          router.push("/dashboard");
+        } else {
+          router.push("/dashboard");
+        }
       } else {
         setError("Invalid email or password. Please try again.")
       }
@@ -84,8 +94,19 @@ export default function LoginPage() {
         throw new Error(data.error || "Invalid 2FA code")
       }
 
+      // Store user data in localStorage
+      localStorage.setItem("user", JSON.stringify(data.user))
+
       // 2FA verification successful, proceed with login
-      router.push("/dashboard")
+      if (data.user.role === "admin") {
+        router.push("/admin")
+      } else if (data.user.role === "staff") {
+        router.push("/dashboard")
+      } else if (data.user.role === "customer") {
+        router.push("/dashboard")
+      } else {
+        router.push("/dashboard")
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : "An error occurred during 2FA verification")
       console.error(err)

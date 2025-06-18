@@ -11,6 +11,8 @@ import { Switch } from "@/components/ui/switch"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Shield, Download, Trash, Clock, CheckCircle, AlertCircle, FileText, Eye, EyeOff } from "lucide-react"
+import { Input } from "@/components/ui/input"
+import { encryptLoanData } from "@/lib/encryption"
 //import { createAuditLog } from "@/lib/audit-logger"
 
 export default function PrivacyPortalPage() {
@@ -23,11 +25,14 @@ export default function PrivacyPortalPage() {
     marketingConsent: true,
     dataSharing: false,
     anonymousAnalytics: true,
+    profileVisibility: "private",
   })
   const [privacyRequests, setPrivacyRequests] = useState<any[]>([])
   const [isLoading, setIsLoading] = useState<boolean>(true)
   const [isSaving, setIsSaving] = useState<boolean>(false)
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false)
+  const [loanAmount, setLoanAmount] = useState("")
+  const [loanPurpose, setLoanPurpose] = useState("")
 
   useEffect(() => {
     if (!loading && (!user || user.role !== "customer")) {
@@ -59,6 +64,7 @@ export default function PrivacyPortalPage() {
             marketingConsent: data.data.settings.marketingConsent,
             dataSharing: data.data.settings.dataSharing,
             anonymousAnalytics: data.data.settings.anonymousAnalytics,
+            profileVisibility: data.data.settings.profileVisibility,
           })
         }
 
@@ -143,6 +149,17 @@ export default function PrivacyPortalPage() {
     }
   }
 
+  const handleLoanApplication = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault()
+    const encryptedData = encryptLoanData({ amount: loanAmount, purpose: loanPurpose })
+    const res = await fetch("/api/loans", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ encryptedData }),
+    })
+    // handle response, show success/failure, etc.
+  }
+
   if (loading || !user) {
     return (
       <div className="flex items-center justify-center min-h-screen">
@@ -166,6 +183,7 @@ export default function PrivacyPortalPage() {
           <TabsTrigger value="settings">Privacy Settings</TabsTrigger>
           <TabsTrigger value="requests">Data Requests</TabsTrigger>
           <TabsTrigger value="activity">Activity Log</TabsTrigger>
+          <TabsTrigger value="loan">Apply for Loan</TabsTrigger>
         </TabsList>
 
         <TabsContent value="overview">
@@ -307,6 +325,25 @@ export default function PrivacyPortalPage() {
                       checked={privacySettings.anonymousAnalytics}
                       onCheckedChange={() => handlePrivacySettingChange("anonymousAnalytics")}
                     />
+                  </div>
+
+                  <div className="flex items-center justify-between">
+                    <div className="space-y-0.5">
+                      <Label htmlFor="profile-visibility">Profile Visibility</Label>
+                      <p className="text-sm text-gray-500 dark:text-gray-400">
+                        Control who can see your profile information
+                      </p>
+                    </div>
+                    <select
+                      id="profile-visibility"
+                      value={privacySettings.profileVisibility}
+                      onChange={e => setPrivacySettings(prev => ({ ...prev, profileVisibility: e.target.value }))}
+                      className="border rounded px-2 py-1"
+                    >
+                      <option value="public">Public</option>
+                      <option value="private">Private</option>
+                      <option value="friends_only">Friends Only</option>
+                    </select>
                   </div>
                 </>
               )}
@@ -568,6 +605,28 @@ export default function PrivacyPortalPage() {
                 Request Detailed Access Log
               </Button>
             </CardFooter>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="loan">
+          <Card>
+            <CardHeader>
+              <CardTitle>Apply for a Loan</CardTitle>
+              <CardDescription>Submit a new loan application</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <form onSubmit={handleLoanApplication}>
+                <div>
+                  <Label htmlFor="amount">Amount</Label>
+                  <Input id="amount" type="number" required value={loanAmount} onChange={e => setLoanAmount(e.target.value)} />
+                </div>
+                <div>
+                  <Label htmlFor="purpose">Purpose</Label>
+                  <Textarea id="purpose" required value={loanPurpose} onChange={e => setLoanPurpose(e.target.value)} />
+                </div>
+                <Button type="submit" className="mt-4">Submit Application</Button>
+              </form>
+            </CardContent>
           </Card>
         </TabsContent>
       </Tabs>

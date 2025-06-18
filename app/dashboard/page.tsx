@@ -8,16 +8,17 @@ import { useAuth } from "@/lib/auth-context"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Button } from "@/components/ui/button"
-import { Shield, Users, FileText, BookOpen, User, Settings, Bell, Activity } from "lucide-react"
+import { Shield, Users, FileText, BookOpen, User, Settings, Bell, Activity, LogOut } from "lucide-react"
 import Link from "next/link"
 
 export default function Dashboard() {
-  const { user, loading } = useAuth()
+  const { user, loading, logout } = useAuth()
   const router = useRouter()
   const [notifications, setNotifications] = useState<any[]>([])
   const [loadingNotifications, setLoadingNotifications] = useState(true)
   const [recentActivity, setRecentActivity] = useState<any[]>([])
   const [loadingActivity, setLoadingActivity] = useState(true)
+  const [isLoggingOut, setIsLoggingOut] = useState(false)
 
   const quickAccessRoutes: Record<string, string> = {
     Profile: "/profile",
@@ -33,6 +34,18 @@ export default function Dashboard() {
       router.push("/login")
     }
   }, [user, loading, router])
+
+  useEffect(() => {
+    if (!loading && user) {
+      if (user.role === "admin") {
+        router.push("/admin");
+      } else if (user.role === "staff" && window.location.pathname !== "/dashboard") {
+        router.push("/dashboard");
+      } else if (user.role === "customer" && window.location.pathname !== "/dashboard") {
+        router.push("/dashboard");
+      }
+    }
+  }, [user, loading, router]);
 
   useEffect(() => {
     const fetchNotifications = async () => {
@@ -64,6 +77,27 @@ export default function Dashboard() {
     if (user) fetchActivity()
   }, [user])
 
+  const handleLogout = async () => {
+    try {
+      setIsLoggingOut(true)
+      // If 2FA is enabled, we should clear the 2FA session first
+      if (user?.twoFactorEnabled) {
+        await fetch('/api/auth/2fa/clear-session', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+        })
+      }
+      await logout()
+      router.push("/login")
+    } catch (error) {
+      console.error('Error during logout:', error)
+    } finally {
+      setIsLoggingOut(false)
+    }
+  }
+
   if (loading || !user) {
     return (
       <div className="flex items-center justify-center min-h-screen">
@@ -74,7 +108,27 @@ export default function Dashboard() {
 
   return (
     <div className="container mx-auto px-4 py-8">
-      <h1 className="text-3xl font-bold mb-6 dark:text-white">Dashboard</h1>
+      <div className="flex justify-between items-center mb-6">
+        <h1 className="text-3xl font-bold dark:text-white">Dashboard</h1>
+        <Button 
+          variant="outline" 
+          onClick={handleLogout}
+          className="flex items-center gap-2"
+          disabled={isLoggingOut}
+        >
+          {isLoggingOut ? (
+            <>
+              <div className="animate-spin rounded-full h-4 w-4 border-t-2 border-b-2 border-green-500"></div>
+              Logging out...
+            </>
+          ) : (
+            <>
+              <LogOut className="h-4 w-4" />
+              Logout
+            </>
+          )}
+        </Button>
+      </div>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
         <DashboardCard

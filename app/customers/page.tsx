@@ -1,7 +1,7 @@
 "use client"
 
 import type React from "react"
-import { useEffect, useState } from "react"
+import { useEffect, useState, useCallback } from "react"
 import { useRouter } from "next/navigation"
 import { useAuth } from "@/lib/auth-context"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -19,6 +19,7 @@ import {
 } from "@/components/ui/dialog"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Eye, EyeOff, Search, UserPlus, Filter, Download, Lock, Shield, AlertTriangle } from "lucide-react"
+import { maskSSN, maskAccountNumber, maskPhoneNumber, maskEmail, maskAddress } from "@/lib/masking-utils"
 
 interface Customer {
   id: string
@@ -55,6 +56,17 @@ interface ApiResponse<T> {
   error?: string
 }
 
+interface Loan {
+  id: string;
+  amount: string;
+  purpose: string;
+  status: "pending" | "approved" | "rejected";
+  createdAt: string;
+  updatedAt: string;
+  approvedBy?: string | null;
+  approvedAt?: string | null;
+}
+
 export default function CustomersPage() {
   const { user, loading, getAccessToken } = useAuth()
   const router = useRouter()
@@ -85,6 +97,11 @@ export default function CustomersPage() {
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [formError, setFormError] = useState<string | null>(null)
   const [formSuccess, setFormSuccess] = useState<string | null>(null)
+  const [loans, setLoans] = useState<Loan[]>([]);
+  const [loanForm, setLoanForm] = useState({ amount: "", purpose: "" });
+  const [loanSubmitting, setLoanSubmitting] = useState(false);
+  const [loanError, setLoanError] = useState<string | null>(null);
+  const [loanSuccess, setLoanSuccess] = useState<string | null>(null);
 
   useEffect(() => {
     if (!loading && (!user || (user.role !== "admin" && user.role !== "staff"))) {
@@ -271,6 +288,51 @@ export default function CustomersPage() {
     }
   }
 
+  const fetchLoans = useCallback(async () => {
+    try {
+      const res = await fetch("/api/loans");
+      const data = await res.json();
+      if (data.success) setLoans(data.data);
+    } catch (e) {
+      // ignore for now
+    }
+  }, []);
+
+  useEffect(() => {
+    if (user && user.role === "customer") fetchLoans();
+  }, [user, fetchLoans]);
+
+  const handleLoanInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+    const { name, value } = e.target;
+    setLoanForm((prev) => ({ ...prev, [name]: value }));
+  };
+
+  const handleLoanSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoanSubmitting(true);
+    setLoanError(null);
+    setLoanSuccess(null);
+    try {
+      const res = await fetch("/api/loans", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(loanForm),
+      });
+      const data = await res.json();
+      if (data.success) {
+        setLoanSuccess("Loan application submitted!");
+        setLoanForm({ amount: "", purpose: "" });
+        fetchLoans();
+      } else {
+        setLoanError(data.error || "Failed to apply for loan");
+      }
+    } catch (e) {
+      setLoanError("Failed to apply for loan");
+    } finally {
+      setLoanSubmitting(false);
+    }
+  };
+
   if (loading || !user || isLoadingCustomers) {
     return (
       <div className="flex items-center justify-center min-h-screen">
@@ -354,8 +416,8 @@ export default function CustomersPage() {
                 {filteredCustomers.map((customer) => (
                   <TableRow key={customer.id}>
                     <TableCell className="font-medium">{customer.name}</TableCell>
-                    <TableCell>{customer.email}</TableCell>
-                    <TableCell>{customer.phone}</TableCell>
+                    <TableCell>{maskEmail(customer.email)}</TableCell>
+                    <TableCell>{maskPhoneNumber(customer.phone)}</TableCell>
                     <TableCell>
                       <Badge
                         variant={
@@ -599,22 +661,30 @@ export default function CustomersPage() {
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       <div className="space-y-1">
                         <p className="text-sm font-medium text-gray-500 dark:text-gray-400">Email</p>
-                        <p className="dark:text-white">{selectedCustomer.email}</p>
+                        <p className="dark:text-white">
+                          {showSensitiveData ? selectedCustomer.email : maskEmail(selectedCustomer.email)}
+                        </p>
                       </div>
                       <div className="space-y-1">
                         <p className="text-sm font-medium text-gray-500 dark:text-gray-400">Phone</p>
-                        <p className="dark:text-white">{selectedCustomer.phone}</p>
+                        <p className="dark:text-white">
+                          {showSensitiveData ? selectedCustomer.phone : maskPhoneNumber(selectedCustomer.phone)}
+                        </p>
                       </div>
                       <div className="space-y-1">
                         <p className="text-sm font-medium text-gray-500 dark:text-gray-400">Address</p>
-                        <p className="dark:text-white">{selectedCustomer.address}</p>
+                        <p className="dark:text-white">
+                          {showSensitiveData ? selectedCustomer.address : maskAddress(selectedCustomer.address)}
+                        </p>
                       </div>
                       <div className="space-y-1">
                         <div className="flex items-center gap-1">
                           <p className="text-sm font-medium text-gray-500 dark:text-gray-400">SSN</p>
                           <Shield className="h-3 w-3 text-red-500" />
                         </div>
-                        <p className="dark:text-white">{showSensitiveData ? selectedCustomer.ssn : "•••-••-••••"}</p>
+                        <p className="dark:text-white">
+                          {showSensitiveData ? selectedCustomer.ssn : maskSSN(selectedCustomer.ssn)}
+                        </p>
                       </div>
                     </div>
                   </TabsContent>
@@ -627,9 +697,7 @@ export default function CustomersPage() {
                           <Shield className="h-3 w-3 text-red-500" />
                         </div>
                         <p className="dark:text-white">
-                          {showSensitiveData
-                            ? selectedCustomer.accountNumber
-                            : "••••••" + selectedCustomer.accountNumber.slice(-4)}
+                          {showSensitiveData ? selectedCustomer.accountNumber : maskAccountNumber(selectedCustomer.accountNumber)}
                         </p>
                       </div>
                       <div className="space-y-1">
@@ -765,6 +833,73 @@ export default function CustomersPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Loan Application Section */}
+      {user.role === "customer" && (
+        <Card className="mb-8">
+          <CardHeader>
+            <CardTitle>Apply for a Loan</CardTitle>
+            <CardDescription>Submit a new loan application</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <form onSubmit={handleLoanSubmit} className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium mb-1">Amount</label>
+                <Input name="amount" type="number" value={loanForm.amount} onChange={handleLoanInputChange} required />
+              </div>
+              <div>
+                <label className="block text-sm font-medium mb-1">Purpose</label>
+                <textarea name="purpose" value={loanForm.purpose} onChange={handleLoanInputChange} required className="w-full border rounded px-2 py-1" />
+              </div>
+              {loanError && <div className="text-red-500 text-sm">{loanError}</div>}
+              {loanSuccess && <div className="text-green-600 text-sm">{loanSuccess}</div>}
+              <Button type="submit" className="bg-green-600 hover:bg-green-700" disabled={loanSubmitting}>
+                {loanSubmitting ? "Submitting..." : "Apply"}
+              </Button>
+            </form>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Loan Status Section */}
+      {user.role === "customer" && loans.length > 0 && (
+        <Card className="mb-8">
+          <CardHeader>
+            <CardTitle>Your Loan Applications</CardTitle>
+            <CardDescription>Track the status of your loan requests</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Amount</TableHead>
+                  <TableHead>Purpose</TableHead>
+                  <TableHead>Status</TableHead>
+                  <TableHead>Submitted</TableHead>
+                  <TableHead>Approved By</TableHead>
+                  <TableHead>Approved At</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {loans.map((loan) => (
+                  <TableRow key={loan.id}>
+                    <TableCell>${loan.amount}</TableCell>
+                    <TableCell>{loan.purpose}</TableCell>
+                    <TableCell>
+                      <Badge variant={loan.status === "approved" ? "default" : loan.status === "rejected" ? "secondary" : "outline"}>
+                        {loan.status.charAt(0).toUpperCase() + loan.status.slice(1)}
+                      </Badge>
+                    </TableCell>
+                    <TableCell>{new Date(loan.createdAt).toLocaleString()}</TableCell>
+                    <TableCell>{loan.approvedBy || "-"}</TableCell>
+                    <TableCell>{loan.approvedAt ? new Date(loan.approvedAt).toLocaleString() : "-"}</TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </CardContent>
+        </Card>
+      )}
     </div>
   )
 }

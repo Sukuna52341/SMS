@@ -182,3 +182,10 @@ export async function initializeTables() {
     console.error("Error initializing database tables:", error)
   }
 }
+
+export async function insertNotification(userId: string, message: string) {
+  await executeQuery(
+    `INSERT INTO notifications (user_id, message, read, created_at) VALUES (?, ?, 0, NOW())`,
+    [userId, message]
+  );
+}

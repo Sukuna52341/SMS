@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useEffect, useState, useCallback } from "react"
 import { useRouter } from "next/navigation"
 import { useAuth } from "@/lib/auth-context"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -74,6 +74,10 @@ export default function AdminPage() {
       manageSystem: false,
     }
   })
+  const [pendingLoans, setPendingLoans] = useState<any[]>([])
+  const [loanActionLoading, setLoanActionLoading] = useState<string | null>(null)
+  const [loanActionError, setLoanActionError] = useState<string | null>(null)
+  const [loanActionSuccess, setLoanActionSuccess] = useState<string | null>(null)
 
   useEffect(() => {
     if (!loading && (!user || user.role !== "admin")) {
@@ -122,6 +126,44 @@ export default function AdminPage() {
       fetchPermissions()
     }
   }, [user])
+
+  const fetchPendingLoans = useCallback(async () => {
+    try {
+      const res = await fetch("/api/loans/pending")
+      const data = await res.json()
+      if (data.success) setPendingLoans(data.data)
+    } catch (e) {
+      // ignore for now
+    }
+  }, [])
+
+  useEffect(() => {
+    if (user && (user.role === "admin" || user.role === "staff")) fetchPendingLoans()
+  }, [user, fetchPendingLoans])
+
+  const handleLoanAction = async (loanId: string, approve: boolean) => {
+    setLoanActionLoading(loanId + (approve ? "-approve" : "-reject"))
+    setLoanActionError(null)
+    setLoanActionSuccess(null)
+    try {
+      const res = await fetch("/api/loans/approve", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ loanId, approve }),
+      })
+      const data = await res.json()
+      if (data.success) {
+        setLoanActionSuccess(approve ? "Loan approved!" : "Loan rejected.")
+        fetchPendingLoans()
+      } else {
+        setLoanActionError(data.error || "Failed to update loan status")
+      }
+    } catch (e) {
+      setLoanActionError("Failed to update loan status")
+    } finally {
+      setLoanActionLoading(null)
+    }
+  }
 
   const downloadReport = async (reportType: string, fileName: string) => {
     const res = await fetch('/api/reports', {
@@ -276,6 +318,7 @@ export default function AdminPage() {
           <TabsTrigger value="users">User Management</TabsTrigger>
           <TabsTrigger value="system">System Settings</TabsTrigger>
           <TabsTrigger value="reports">Reports</TabsTrigger>
+          <TabsTrigger value="loans">Loan Approvals</TabsTrigger>
         </TabsList>
 
         <TabsContent value="security">
@@ -817,6 +860,56 @@ export default function AdminPage() {
               </CardContent>
             </Card>
           </div>
+        </TabsContent>
+
+        <TabsContent value="loans">
+          <Card>
+            <CardHeader>
+              <CardTitle>Pending Loan Applications</CardTitle>
+              <CardDescription>Review and approve/reject customer loan requests</CardDescription>
+            </CardHeader>
+            <CardContent>
+              {loanActionError && <div className="text-red-500 text-sm mb-2">{loanActionError}</div>}
+              {loanActionSuccess && <div className="text-green-600 text-sm mb-2">{loanActionSuccess}</div>}
+              <div className="overflow-x-auto">
+                <table className="min-w-full border">
+                  <thead>
+                    <tr>
+                      <th className="px-3 py-2 border">Customer</th>
+                      <th className="px-3 py-2 border">Email</th>
+                      <th className="px-3 py-2 border">Amount</th>
+                      <th className="px-3 py-2 border">Purpose</th>
+                      <th className="px-3 py-2 border">Submitted</th>
+                      <th className="px-3 py-2 border">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {pendingLoans.length === 0 ? (
+                      <tr><td colSpan={6} className="text-center py-4">No pending loans</td></tr>
+                    ) : (
+                      pendingLoans.map((loan) => (
+                        <tr key={loan.id}>
+                          <td className="border px-3 py-2">{loan.customerName}</td>
+                          <td className="border px-3 py-2">{loan.customerEmail}</td>
+                          <td className="border px-3 py-2">${loan.amount}</td>
+                          <td className="border px-3 py-2">{loan.purpose}</td>
+                          <td className="border px-3 py-2">{new Date(loan.createdAt).toLocaleString()}</td>
+                          <td className="border px-3 py-2 flex gap-2">
+                            <Button size="sm" className="bg-green-600 hover:bg-green-700" disabled={loanActionLoading === loan.id + "-approve"} onClick={() => handleLoanAction(loan.id, true)}>
+                              {loanActionLoading === loan.id + "-approve" ? "Approving..." : "Approve"}
+                            </Button>
+                            <Button size="sm" variant="destructive" disabled={loanActionLoading === loan.id + "-reject"} onClick={() => handleLoanAction(loan.id, false)}>
+                              {loanActionLoading === loan.id + "-reject" ? "Rejecting..." : "Reject"}
+                            </Button>
+                          </td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </CardContent>
+          </Card>
         </TabsContent>
       </Tabs>
     </div>

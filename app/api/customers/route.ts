@@ -4,9 +4,10 @@ import { getUserFromRequest } from "@/lib/auth-utils"
 import { getAllCustomers, getCustomerById, type Customer } from "@/lib/customer-service"
 import { createUser } from "@/lib/db"
 import { saveCustomer } from "@/lib/customer-service"
-import { encryptSSN, encryptAccountNumber } from "@/lib/encryption-utils"
+import { encryptSSN, encryptAccountNumber, decryptSSN, decryptAccountNumber } from "@/lib/encryption-utils"
 import { getUserByEmail } from "@/lib/db"
 import { getCustomerByUserId } from "@/lib/customer-service"
+import { maskSSN, maskAccountNumber, maskPhoneNumber, maskEmail, maskAddress } from "@/lib/masking-utils"
 
 interface ApiResponse<T> {
   success: boolean
@@ -15,14 +16,23 @@ interface ApiResponse<T> {
 }
 
 function processCustomerData(customer: Customer, showSensitive: boolean = false, canViewSensitive: boolean = false) {
+  let ssnMaskedOrDecrypted = maskSSN("");
+  let accountNumberMaskedOrDecrypted = maskAccountNumber("");
+  if (showSensitive && canViewSensitive) {
+    ssnMaskedOrDecrypted = customer.ssn_encrypted ? decryptSSN(customer.ssn_encrypted) : "";
+    accountNumberMaskedOrDecrypted = customer.account_number_encrypted ? decryptAccountNumber(customer.account_number_encrypted) : "";
+  } else {
+    ssnMaskedOrDecrypted = maskSSN(""); // Always show masked, since we don't have the raw value
+    accountNumberMaskedOrDecrypted = maskAccountNumber("");
+  }
   return {
     id: customer.id,
     name: customer.name,
-    email: customer.email,
-    phone: customer.phone,
-    address: customer.address,
-    ssn: "•••-••-••••",
-    accountNumber: "••••••" + (customer.account_number_encrypted ? "1234" : "••••"),
+    email: showSensitive && canViewSensitive ? customer.email : maskEmail(customer.email),
+    phone: showSensitive && canViewSensitive ? customer.phone : maskPhoneNumber(customer.phone),
+    address: showSensitive && canViewSensitive ? customer.address : maskAddress(customer.address),
+    ssn: ssnMaskedOrDecrypted,
+    accountNumber: accountNumberMaskedOrDecrypted,
     creditScore: customer.credit_score,
     loanAmount: customer.loan_amount,
     status: customer.status,

@@ -9,6 +9,7 @@ export interface User {
   name: string
   email: string
   role: "admin" | "staff" | "customer"
+  twoFactorEnabled?: boolean
 }
 
 interface AuthContextType {
@@ -60,14 +61,29 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }, [])
 
-  // Load user from localStorage
+  // Load user from localStorage and listen for changes
   useEffect(() => {
-    const storedUser = localStorage.getItem("user")
-    if (storedUser) {
-      setUser(JSON.parse(storedUser))
+    const handleStorageChange = () => {
+      const storedUser = localStorage.getItem("user")
+      if (storedUser) {
+        setUser(JSON.parse(storedUser))
+      } else {
+        setUser(null)
+      }
     }
+
+    // Initial load
+    handleStorageChange()
+
+    // Listen for changes
+    window.addEventListener('storage', handleStorageChange)
+    
     setLoading(false)
-  }, [])
+
+    return () => {
+      window.removeEventListener('storage', handleStorageChange)
+    }
+  }, []) // Empty dependency array means this runs once on mount
 
   const login = async (email: string, password: string): Promise<boolean> => {
     setLoading(true)
