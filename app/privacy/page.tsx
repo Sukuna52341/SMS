@@ -13,11 +13,13 @@ import { Textarea } from "@/components/ui/textarea"
 import { Shield, Download, Trash, Clock, CheckCircle, AlertCircle, FileText, Eye, EyeOff } from "lucide-react"
 import { Input } from "@/components/ui/input"
 import { encryptLoanData } from "@/lib/encryption"
+import { useToast } from "@/hooks/use-toast"
 //import { createAuditLog } from "@/lib/audit-logger"
 
 export default function PrivacyPortalPage() {
   const { user, loading } = useAuth()
   const router = useRouter()
+  const { toast } = useToast()
   const [requestType, setRequestType] = useState<string>("")
   const [requestReason, setRequestReason] = useState<string>("")
   const [requestSubmitted, setRequestSubmitted] = useState<boolean>(false)
@@ -33,12 +35,16 @@ export default function PrivacyPortalPage() {
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false)
   const [loanAmount, setLoanAmount] = useState("")
   const [loanPurpose, setLoanPurpose] = useState("")
+  const [loanSubmitting, setLoanSubmitting] = useState<boolean>(false)
+  const [loans, setLoans] = useState<any[]>([])
+  const [loansLoading, setLoansLoading] = useState<boolean>(false)
 
   useEffect(() => {
     if (!loading && (!user || user.role !== "customer")) {
       router.push("/login")
     } else if (user) {
       fetchPrivacyData()
+      fetchLoans()
     }
   }, [user, loading, router])
 
@@ -77,6 +83,65 @@ export default function PrivacyPortalPage() {
       console.error("Error fetching privacy data:", error)
     } finally {
       setIsLoading(false)
+    }
+  }
+
+  const fetchLoans = async () => {
+    try {
+      setLoansLoading(true)
+      const response = await fetch("/api/loans")
+      if (!response.ok) {
+        // Try to parse error message if possible
+        let errorMsg = `Network response was not ok (status ${response.status})`
+        try {
+          const errorData = await response.json()
+          if (errorData && errorData.error) errorMsg = errorData.error
+        } catch {}
+        toast({
+          title: "Failed to fetch loans",
+          description: errorMsg,
+          variant: "destructive",
+        })
+        setLoans([])
+        return
+      }
+      const data = await response.json().catch(() => null)
+      if (data && data.success) {
+        // Check for status changes
+        const newLoans = data.data
+        const oldLoans = loans
+        newLoans.forEach((newLoan: any) => {
+          const oldLoan = oldLoans.find((old: any) => old.id === newLoan.id)
+          if (oldLoan && oldLoan.status !== newLoan.status) {
+            if (newLoan.status === "approved") {
+              toast({
+                title: "Loan Approved! 🎉",
+                description: `Your loan application for ${newLoan.amount} XAF has been approved!`,
+                variant: "default",
+              })
+            } else if (newLoan.status === "rejected") {
+              toast({
+                title: "Loan Application Update",
+                description: `Your loan application for ${newLoan.amount} XAF was not approved. Please contact support for more information.`,
+                variant: "destructive",
+              })
+            }
+          }
+        })
+        setLoans(newLoans)
+      } else {
+        setLoans([])
+      }
+    } catch (error) {
+      console.error("Error fetching loans:", error)
+      setLoans([])
+      toast({
+        title: "Error fetching loans",
+        description: error instanceof Error ? error.message : String(error),
+        variant: "destructive",
+      })
+    } finally {
+      setLoansLoading(false)
     }
   }
 
@@ -135,15 +200,35 @@ export default function PrivacyPortalPage() {
       const data = await response.json()
 
       if (data.success) {
+        // Show toast notification
+        toast({
+          title: "Data Request Submitted!",
+          description: `Your ${requestType} request has been successfully submitted. We will process it within 30 days and contact you if we need additional information.`,
+          variant: "default",
+        })
+        
         setRequestSubmitted(true)
         setRequestType("")
         setRequestReason("")
 
         // Refresh privacy requests
         fetchPrivacyData()
+      } else {
+        // Show error toast
+        toast({
+          title: "Request Failed",
+          description: data.error || "Failed to submit data request. Please try again.",
+          variant: "destructive",
+        })
       }
     } catch (error) {
       console.error("Error submitting privacy request:", error)
+      // Show error toast
+      toast({
+        title: "Request Error",
+        description: "An error occurred while submitting your request. Please try again.",
+        variant: "destructive",
+      })
     } finally {
       setIsSubmitting(false)
     }
@@ -151,13 +236,47 @@ export default function PrivacyPortalPage() {
 
   const handleLoanApplication = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault()
-    const encryptedData = encryptLoanData({ amount: loanAmount, purpose: loanPurpose })
-    const res = await fetch("/api/loans", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ encryptedData }),
-    })
-    // handle response, show success/failure, etc.
+    setLoanSubmitting(true)
+    
+    try {
+      const encryptedData = encryptLoanData({ amount: loanAmount, purpose: loanPurpose })
+      const res = await fetch("/api/loans", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ encryptedData }),
+      })
+      
+      const data = await res.json()
+      
+      if (data.success) {
+        toast({
+          title: "Loan Application Submitted!",
+          description: "Your loan application has been successfully submitted and is under review. You will be notified once a decision is made.",
+          variant: "default",
+        })
+        
+        // Clear form
+        setLoanAmount("")
+        setLoanPurpose("")
+        
+        // Refresh loans list
+        fetchLoans()
+      } else {
+        toast({
+          title: "Application Failed",
+          description: data.error || "Failed to submit loan application. Please try again.",
+          variant: "destructive",
+        })
+      }
+    } catch (error) {
+      toast({
+        title: "Application Error",
+        description: "An error occurred while submitting your application. Please try again.",
+        variant: "destructive",
+      })
+    } finally {
+      setLoanSubmitting(false)
+    }
   }
 
   if (loading || !user) {
@@ -609,25 +728,135 @@ export default function PrivacyPortalPage() {
         </TabsContent>
 
         <TabsContent value="loan">
-          <Card>
-            <CardHeader>
-              <CardTitle>Apply for a Loan</CardTitle>
-              <CardDescription>Submit a new loan application</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <form onSubmit={handleLoanApplication}>
-                <div>
-                  <Label htmlFor="amount">Amount</Label>
-                  <Input id="amount" type="number" required value={loanAmount} onChange={e => setLoanAmount(e.target.value)} />
-                </div>
-                <div>
-                  <Label htmlFor="purpose">Purpose</Label>
-                  <Textarea id="purpose" required value={loanPurpose} onChange={e => setLoanPurpose(e.target.value)} />
-                </div>
-                <Button type="submit" className="mt-4">Submit Application</Button>
-              </form>
-            </CardContent>
-          </Card>
+          <div className="space-y-6">
+            <Card>
+              <CardHeader>
+                <CardTitle>Apply for a Loan</CardTitle>
+                <CardDescription>Submit a new loan application</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <form onSubmit={handleLoanApplication}>
+                  <div className="space-y-4">
+                    <div>
+                      <Label htmlFor="amount">Amount</Label>
+                      <Input 
+                        id="amount" 
+                        type="number" 
+                        required 
+                        value={loanAmount} 
+                        onChange={e => setLoanAmount(e.target.value)} 
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor="purpose">Purpose</Label>
+                      <Textarea 
+                        id="purpose" 
+                        required 
+                        value={loanPurpose} 
+                        onChange={e => setLoanPurpose(e.target.value)} 
+                      />
+                    </div>
+                    <Button type="submit" className="mt-4" disabled={loanSubmitting}>
+                      {loanSubmitting ? (
+                        <>
+                          <span className="animate-spin mr-2">⟳</span>
+                          Submitting...
+                        </>
+                      ) : (
+                        "Submit Application"
+                      )}
+                    </Button>
+                  </div>
+                </form>
+              </CardContent>
+            </Card>
+
+            {/* Loan Status Section */}
+            {loans.length > 0 && (
+              <Card>
+                <CardHeader>
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <CardTitle>Your Loan Applications</CardTitle>
+                      <CardDescription>Track the status of your loan requests</CardDescription>
+                    </div>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={fetchLoans}
+                      disabled={loansLoading}
+                    >
+                      {loansLoading ? (
+                        <>
+                          <span className="animate-spin mr-2">⟳</span>
+                          Refreshing...
+                        </>
+                      ) : (
+                        "Refresh"
+                      )}
+                    </Button>
+                  </div>
+                </CardHeader>
+                <CardContent>
+                  {loansLoading ? (
+                    <div className="flex justify-center py-6">
+                      <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-green-500"></div>
+                    </div>
+                  ) : (
+                    <div className="space-y-4">
+                      {loans.map((loan) => (
+                        <div key={loan.id} className="border rounded-lg p-4">
+                          <div className="flex items-center justify-between mb-2">
+                            <div className="flex items-center gap-2">
+                              <span className="font-medium">{loan.amount} XAF</span>
+                              <Badge 
+                                variant={
+                                  loan.status === "approved" 
+                                    ? "default" 
+                                    : loan.status === "rejected" 
+                                      ? "secondary" 
+                                      : "outline"
+                                }
+                              >
+                                {loan.status.charAt(0).toUpperCase() + loan.status.slice(1)}
+                              </Badge>
+                            </div>
+                            <span className="text-sm text-gray-500">
+                              {new Date(loan.createdAt).toLocaleDateString()}
+                            </span>
+                          </div>
+                          <p className="text-sm text-gray-600 dark:text-gray-400 mb-2">
+                            <strong>Purpose:</strong> {loan.purpose}
+                          </p>
+                          {loan.status === "approved" && (
+                            <div className="bg-green-50 dark:bg-green-900/20 p-3 rounded-md">
+                              <p className="text-sm text-green-800 dark:text-green-400">
+                                <strong>Congratulations!</strong> Your loan has been approved. You will receive further instructions via email.
+                              </p>
+                            </div>
+                          )}
+                          {loan.status === "rejected" && (
+                            <div className="bg-red-50 dark:bg-red-900/20 p-3 rounded-md">
+                              <p className="text-sm text-red-800 dark:text-red-400">
+                                <strong>Application Status:</strong> Your loan application was not approved at this time. Please contact support for more information.
+                              </p>
+                            </div>
+                          )}
+                          {loan.status === "pending" && (
+                            <div className="bg-yellow-50 dark:bg-yellow-900/20 p-3 rounded-md">
+                              <p className="text-sm text-yellow-800 dark:text-yellow-400">
+                                <strong>Application Status:</strong> Your application is currently under review. You will be notified once a decision is made.
+                              </p>
+                            </div>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            )}
+          </div>
         </TabsContent>
       </Tabs>
     </div>

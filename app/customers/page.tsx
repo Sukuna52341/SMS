@@ -883,7 +883,7 @@ export default function CustomersPage() {
               <TableBody>
                 {loans.map((loan) => (
                   <TableRow key={loan.id}>
-                    <TableCell>${loan.amount}</TableCell>
+                    <TableCell>{loan.amount} XAF</TableCell>
                     <TableCell>{loan.purpose}</TableCell>
                     <TableCell>
                       <Badge variant={loan.status === "approved" ? "default" : loan.status === "rejected" ? "secondary" : "outline"}>

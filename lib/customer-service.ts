@@ -103,10 +103,8 @@ export async function saveCustomer({
     status,
 }: SaveCustomerInput): Promise<Customer | null> {
   try {
-    const id = generateId(); // Generate a unique ID for the customer
-
-    // Explicitly type the result of executeQuery for INSERT
-    const [result] = await executeQuery<[any, any]>(
+    const id = generateId(); // Generate a unique ID for the customer    // Explicitly type the result of executeQuery for INSERT
+    const result = await executeQuery<any>(
       `INSERT INTO customers
        (id, user_id, name, email, phone, address, ssn_encrypted, account_number_encrypted, credit_score, loan_amount, status, created_at, updated_at)
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())`, // Use NOW() for timestamps
@@ -174,7 +172,7 @@ export async function getCustomerByUserId(userId: string): Promise<Customer | nu
       "SELECT * FROM customers WHERE user_id = ?",
       [userId]
     );
-    return result[0]?.[0] || null;
+    return result[0] || null; // Fixed: return the first row or null
   } catch (error) {
     console.error("Error fetching customer by userId:", error);
     return null;

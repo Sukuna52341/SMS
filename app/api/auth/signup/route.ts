@@ -1,6 +1,8 @@
 import { type NextRequest, NextResponse } from "next/server"
 import { createUser, emailExists } from "@/app/api/db-service"
 import { createAuditLog } from "@/lib/audit-logger"
+import { saveCustomer } from "@/lib/customer-service"
+import { encryptSSN, encryptAccountNumber } from "@/lib/encryption-utils"
 
 export async function POST(request: NextRequest) {
   try {
@@ -24,6 +26,30 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Failed to create user" }, { status: 500 })
     }
 
+    // If the user is a customer, also create a customer record
+    if (user.role === "customer") {
+      // Use empty/default values for required fields
+      const phone = "";
+      const address = "";
+      const ssn_encrypted = await encryptSSN("");
+      const account_number_encrypted = await encryptAccountNumber("");
+      const credit_score = null;
+      const loan_amount = null;
+      const status = user.status || "active";
+      await saveCustomer({
+        userId: user.id,
+        name: user.name,
+        email: user.email,
+        phone,
+        address,
+        ssn_encrypted,
+        account_number_encrypted,
+        credit_score,
+        loan_amount,
+        status,
+      });
+    }
+
     // Log the signup
     createAuditLog({
       action: "SIGNUP",
@@ -37,6 +63,7 @@ export async function POST(request: NextRequest) {
 
     // Return success
     return NextResponse.json({
+      success: true,
       message: "User created successfully",
       user: {
         id: user.id,

@@ -4,6 +4,7 @@ import Link from "next/link"
 import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { ModeToggle } from "./mode-toggle"
+import { NotificationBell } from "./notification-bell"
 import { useAuth } from "@/lib/auth-context"
 import {
   DropdownMenu,
@@ -106,6 +107,7 @@ export default function Navbar() {
 
           <div className="hidden md:flex items-center space-x-2">
             <ModeToggle />
+            {user && <NotificationBell />}
             {!loading &&
               (user ? (
                 <DropdownMenu>
@@ -146,6 +148,7 @@ export default function Navbar() {
           {/* Mobile menu button */}
           <div className="md:hidden flex items-center space-x-2">
             <ModeToggle />
+            {user && <NotificationBell />}
             <Button variant="ghost" size="icon" onClick={() => setIsMenuOpen(!isMenuOpen)} aria-label="Toggle menu">
               {isMenuOpen ? <X className="h-6 w-6" /> : <Menu className="h-6 w-6" />}
             </Button>

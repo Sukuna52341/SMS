@@ -891,7 +891,7 @@ export default function AdminPage() {
                         <tr key={loan.id}>
                           <td className="border px-3 py-2">{loan.customerName}</td>
                           <td className="border px-3 py-2">{loan.customerEmail}</td>
-                          <td className="border px-3 py-2">${loan.amount}</td>
+                          <td className="border px-3 py-2">{loan.amount} XAF</td>
                           <td className="border px-3 py-2">{loan.purpose}</td>
                           <td className="border px-3 py-2">{new Date(loan.createdAt).toLocaleString()}</td>
                           <td className="border px-3 py-2 flex gap-2">

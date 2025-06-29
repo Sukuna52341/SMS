@@ -21,6 +21,7 @@ export default function SignupPage() {
   const [confirmPassword, setConfirmPassword] = useState("")
   const [role, setRole] = useState("customer")
   const [error, setError] = useState("")
+  const [success, setSuccess] = useState("")
   const [isLoading, setIsLoading] = useState(false)
   const [passwordFocused, setPasswordFocused] = useState(false)
   const router = useRouter()
@@ -60,6 +61,7 @@ export default function SignupPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setError("")
+    setSuccess("")
 
     // Validate inputs
     if (!name || !email || !password || !confirmPassword) {
@@ -101,8 +103,10 @@ export default function SignupPage() {
       const data = await response.json()
 
       if (data.success) {
-        // Redirect to login page on success
-        router.push("/login?registered=true")
+        setSuccess("Account created successfully! Redirecting to login...")
+        setTimeout(() => {
+          router.push("/login?registered=true")
+        }, 2000)
       } else {
         setError(data.error || "Registration failed. Please try again.")
       }
@@ -129,6 +133,12 @@ export default function SignupPage() {
             <Alert variant="destructive" className="mb-4">
               <AlertCircle className="h-4 w-4" />
               <AlertDescription>{error}</AlertDescription>
+            </Alert>
+          )}
+          {success && (
+            <Alert variant="default" className="mb-4">
+              <Check className="h-4 w-4 text-green-600" />
+              <AlertDescription>{success}</AlertDescription>
             </Alert>
           )}
           <form onSubmit={handleSubmit} className="space-y-4">

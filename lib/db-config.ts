@@ -1,4 +1,5 @@
 import mysql from "mysql2/promise"
+import { v4 as uuidv4 } from "uuid"
 
 // Configuration for MySQL database
 const dbConfig = {
@@ -185,7 +186,7 @@ export async function initializeTables() {
 
 export async function insertNotification(userId: string, message: string) {
   await executeQuery(
-    `INSERT INTO notifications (user_id, message, read, created_at) VALUES (?, ?, 0, NOW())`,
-    [userId, message]
+    `INSERT INTO notifications (id, user_id, message, \`read\`, created_at) VALUES (?, ?, ?, 0, NOW())`,
+    [uuidv4(), userId, message]
   );
 }

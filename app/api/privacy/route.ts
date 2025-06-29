@@ -1,7 +1,7 @@
 import { type NextRequest, NextResponse } from "next/server"
 import { createAuditLog } from "@/lib/audit-logger"
 import { getUserFromRequest } from "@/lib/auth-utils"
-import { savePrivacyRequest, type PrivacyRequest, type PrivacySettings } from "@/lib/privacy-service"
+import { savePrivacyRequest, type PrivacyRequest, type PrivacySettings, getPrivacyRequests } from "@/lib/privacy-service"
 
 // Type for settings in PUT request
 interface PrivacySettingsUpdate {
@@ -20,8 +20,7 @@ export async function GET(request: NextRequest) {
     }
 
     // Fetch privacy requests for the user from the database
-    // const requests = await getPrivacyRequestsForUser(user.id)
-    const requests: PrivacyRequest[] = [] // Explicitly typed as PrivacyRequest array
+    const requests = await getPrivacyRequests(user.id)
 
     // Server-side audit log with guaranteed string values
     createAuditLog({
@@ -34,7 +33,7 @@ export async function GET(request: NextRequest) {
       details: `User viewed their privacy requests`,
     })
 
-    return NextResponse.json({ requests })
+    return NextResponse.json({ success: true, data: { requests } })
   } catch (error) {
     console.error("Error getting privacy requests:", error)
     return NextResponse.json(
@@ -93,6 +92,7 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json(
       { 
+        success: true,
         message: "Privacy request created successfully", 
         request: privacyRequest 
       },
