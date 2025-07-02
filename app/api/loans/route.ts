@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getUserFromRequest } from "@/lib/auth-utils";
 import { executeQuery, insertNotification } from "@/lib/db-config";
-import { encryptLoanData, decryptLoanData } from "@/lib/encryption";
+import { encryptLoanAmount, encryptLoanPurpose, decryptLoanAmount, decryptLoanPurpose } from "@/lib/encryption-utils";
 import { createAuditLog } from "@/lib/audit-logger";
 import { getCustomerByUserId } from "@/lib/customer-service";
 
@@ -9,17 +9,16 @@ export async function POST(request: NextRequest) {
   const user = await getUserFromRequest(request);
   if (!user || user.role !== "customer") return NextResponse.json({ success: false, error: "Unauthorized" }, { status: 401 });
 
-  const { encryptedData } = await request.json();
-  const loanData = decryptLoanData(encryptedData);
-  if (!loanData) return NextResponse.json({ success: false, error: "Invalid loan data" }, { status: 400 });
+  const { amount, purpose } = await request.json();
+  if (!amount || !purpose) return NextResponse.json({ success: false, error: "Invalid loan data" }, { status: 400 });
 
   // Get the customer id for this user
   const customer = await getCustomerByUserId(user.id);
   if (!customer) return NextResponse.json({ success: false, error: "Customer record not found" }, { status: 404 });
 
-  // Encrypt amount and purpose separately
-  const amountEncrypted = encryptLoanData({ amount: loanData.amount });
-  const purposeEncrypted = encryptLoanData({ purpose: loanData.purpose });
+  // Encrypt amount and purpose separately using Node crypto (string-based)
+  const amountEncrypted = await encryptLoanAmount(String(amount));
+  const purposeEncrypted = await encryptLoanPurpose(String(purpose));
 
   // Save to DB
   const result: any = await executeQuery(
@@ -41,7 +40,7 @@ export async function POST(request: NextRequest) {
   });
 
   // Send notification to customer
-  await insertNotification(user.id, `Your loan application for ${loanData.amount} XAF has been submitted and is under review.`);
+  await insertNotification(user.id, `Your loan application for ${amount} XAF has been submitted and is under review.`);
 
   return NextResponse.json({ success: true });
 }
@@ -60,12 +59,38 @@ export async function GET(request: NextRequest) {
     [customer.id]
   );
   const decryptedLoans = loans.map((loan: any) => {
-    const amountData = decryptLoanData(loan.amount_encrypted?.toString?.() ?? "");
-    const purposeData = decryptLoanData(loan.purpose_encrypted?.toString?.() ?? "");
+    let amount = null;
+    let purpose = null;
+    try {
+      let encrypted = loan.amount_encrypted;
+      if (Buffer.isBuffer(encrypted)) {
+        const asString = encrypted.toString('utf8');
+        if (/^[A-Za-z0-9+/=]+$/.test(asString) && asString.length > 20) {
+          encrypted = Buffer.from(asString, 'base64');
+        }
+      }
+      amount = decryptLoanAmount(encrypted);
+    } catch {
+      amount = null;
+    }
+    try {
+      let encrypted = loan.purpose_encrypted;
+      if (Buffer.isBuffer(encrypted)) {
+        const asString = encrypted.toString('utf8');
+        if (/^[A-Za-z0-9+/=]+$/.test(asString) && asString.length > 20) {
+          encrypted = Buffer.from(asString, 'base64');
+        }
+      }
+      purpose = decryptLoanPurpose(encrypted);
+    } catch {
+      purpose = null;
+    }
+    // Log the decrypted values
+    console.log('Decrypted loan:', { id: loan.id, amount, purpose });
     return {
       id: loan.id,
-      amount: amountData?.amount ?? null,
-      purpose: purposeData?.purpose ?? null,
+      amount,
+      purpose,
       status: loan.status,
       createdAt: loan.created_at,
     };

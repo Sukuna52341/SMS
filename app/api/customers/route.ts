@@ -115,7 +115,29 @@ export async function POST(request: NextRequest) {
         )
       }
 
-      const canViewSensitive = user.role === "admin"
+      // Permission check: allow admin/staff, or the customer who owns the record
+      const isOwner = user.role === "customer" && customer.user_id === user.id;
+      const isAdminOrStaff = user.role === "admin" || user.role === "staff";
+      if (!isAdminOrStaff && !isOwner) {
+        createAuditLog({
+          action: "UNAUTHORIZED_ACCESS",
+          resourceType: "CUSTOMER",
+          resourceId: customerId,
+          userId: user.id,
+          userName: user.name,
+          userRole: user.role,
+          details: `Attempted to access customer ${customerId} without permission`,
+          ipAddress: request.headers.get("x-forwarded-for") || "127.0.0.1",
+          userAgent: request.headers.get("user-agent") || "Unknown",
+        });
+        return NextResponse.json(
+          { success: false, error: "Unauthorized access" },
+          { status: 403 }
+        );
+      }
+
+      // Only admin can view sensitive data
+      const canViewSensitive = user.role === "admin";
       createAuditLog({
         action: "VIEW",
         resourceType: "CUSTOMER",

@@ -1,5 +1,4 @@
 import { type NextRequest, NextResponse } from "next/server"
-import { cookies } from "next/headers"
 import { sign } from "jsonwebtoken"
 import speakeasy from "speakeasy"
 import { executeQuery } from "@/lib/db-config"
@@ -48,11 +47,18 @@ export async function POST(request: NextRequest) {
       { expiresIn: "8h" }
     )
 
-    // Set cookie
-    const cookieStore = await cookies()
-    cookieStore.set({
-      name: "auth_token",
-      value: token,
+    // Prepare response
+    const response = NextResponse.json({
+      user: {
+        id: user.id,
+        name: user.name,
+        email: email,
+        role: user.role,
+      },
+    })
+
+    // Set cookie on the response
+    response.cookies.set("auth_token", token, {
       httpOnly: true,
       path: "/",
       secure: process.env.NODE_ENV === "production",
@@ -60,7 +66,7 @@ export async function POST(request: NextRequest) {
     })
 
     // Log the successful 2FA verification
-    createAuditLog({
+    await createAuditLog({
       action: "2FA_VERIFICATION",
       resourceType: "USER",
       resourceId: user.id,
@@ -70,16 +76,9 @@ export async function POST(request: NextRequest) {
       details: `2FA verification successful for user: ${email}`,
     })
 
-    return NextResponse.json({
-      user: {
-        id: user.id,
-        name: user.name,
-        email: email,
-        role: user.role,
-      },
-    })
+    return response
   } catch (error) {
     console.error("2FA verification error:", error)
     return NextResponse.json({ error: "An error occurred during 2FA verification" }, { status: 500 })
   }
-} 
+}

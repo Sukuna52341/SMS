@@ -4,8 +4,8 @@ import { generateId } from "./db";
 export interface Loan {
   id: string;
   customer_id: string;
-  amount_encrypted: Buffer;
-  purpose_encrypted: Buffer;
+  amount_encrypted: string;
+  purpose_encrypted: string;
   status: "pending" | "approved" | "rejected";
   created_at: Date;
   updated_at: Date;
@@ -15,8 +15,8 @@ export interface Loan {
 
 export interface SaveLoanInput {
   customerId: string;
-  amount_encrypted: Buffer;
-  purpose_encrypted: Buffer;
+  amount_encrypted: string;
+  purpose_encrypted: string;
   status: "pending" | "approved" | "rejected";
 }
 

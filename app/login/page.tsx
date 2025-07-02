@@ -86,6 +86,7 @@ export default function LoginPage() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email, code: twoFACode }),
+        credentials: "include", // <-- Ensure cookie is stored
       })
 
       const data = await response.json()

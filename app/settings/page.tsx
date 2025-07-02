@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import Navbar from "@/components/navbar";
 
 export default function SettingsPage() {
   const [twofaEnabled, setTwofaEnabled] = useState(false);
@@ -112,42 +113,45 @@ export default function SettingsPage() {
   };
 
   return (
-    <div className="max-w-lg mx-auto mt-10 p-6 border rounded">
-      <h2 className="text-2xl font-bold mb-4">Two-Factor Authentication</h2>
-      {message && <div className="mb-4 text-center text-sm text-green-600">{message}</div>}
-      {twofaEnabled ? (
-        <div>
-          <p className="mb-4">2FA is currently <b>enabled</b> on your account.</p>
-          <Button onClick={handleDisable} disabled={loading}>
-            {loading ? "Disabling..." : "Disable 2FA"}
-          </Button>
-        </div>
-      ) : (
-        <div>
-          <p className="mb-4">2FA is <b>not enabled</b> on your account.</p>
-          {!qr ? (
-            <Button onClick={handleGenerate} disabled={loading}>
-              {loading ? "Loading..." : "Enable 2FA"}
+    <>
+      <Navbar />
+      <div className="max-w-lg mx-auto mt-10 p-6 border rounded">
+        <h2 className="text-2xl font-bold mb-4">Two-Factor Authentication</h2>
+        {message && <div className="mb-4 text-center text-sm text-green-600">{message}</div>}
+        {twofaEnabled ? (
+          <div>
+            <p className="mb-4">2FA is currently <b>enabled</b> on your account.</p>
+            <Button onClick={handleDisable} disabled={loading}>
+              {loading ? "Disabling..." : "Disable 2FA"}
             </Button>
-          ) : (
-            <div>
-              <p className="mb-2">Scan this QR code with your authenticator app:</p>
-              <img src={qr} alt="2FA QR Code" className="mx-auto mb-2" />
-              <p className="mb-2">Or enter this code manually: <b>{secret}</b></p>
-              <Input
-                type="text"
-                placeholder="Enter 6-digit code"
-                value={code}
-                onChange={e => setCode(e.target.value)}
-                className="mb-2"
-              />
-              <Button onClick={handleEnable} disabled={loading || !code}>
-                {loading ? "Enabling..." : "Verify & Enable"}
+          </div>
+        ) : (
+          <div>
+            <p className="mb-4">2FA is <b>not enabled</b> on your account.</p>
+            {!qr ? (
+              <Button onClick={handleGenerate} disabled={loading}>
+                {loading ? "Loading..." : "Enable 2FA"}
               </Button>
-            </div>
-          )}
-        </div>
-      )}
-    </div>
+            ) : (
+              <div>
+                <p className="mb-2">Scan this QR code with your authenticator app:</p>
+                <img src={qr} alt="2FA QR Code" className="mx-auto mb-2" />
+                <p className="mb-2">Or enter this code manually: <b>{secret}</b></p>
+                <Input
+                  type="text"
+                  placeholder="Enter 6-digit code"
+                  value={code}
+                  onChange={e => setCode(e.target.value)}
+                  className="mb-2"
+                />
+                <Button onClick={handleEnable} disabled={loading || !code}>
+                  {loading ? "Enabling..." : "Verify & Enable"}
+                </Button>
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+    </>
   );
 }

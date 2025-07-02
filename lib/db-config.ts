@@ -14,8 +14,14 @@ const dbConfig = {
   keepAliveInitialDelay: 0,
 }
 
-// Create and export the connection pool directly
-export const pool = mysql.createPool(dbConfig)
+// Use a singleton pool to avoid too many connections in dev/hot reload
+let pool: mysql.Pool;
+if (!(global as any).mysqlPool) {
+  (global as any).mysqlPool = mysql.createPool(dbConfig);
+}
+pool = (global as any).mysqlPool;
+
+export { pool }
 
 // Function to execute a query
 export async function executeQuery<T>(query: string, params: any[] = []): Promise<T> {
@@ -25,9 +31,6 @@ export async function executeQuery<T>(query: string, params: any[] = []): Promis
   } catch (error) {
     console.error("Database query error:", error)
     throw error
-  } finally {
-    // Note: We don't release the connection here because we're using the pool directly
-    // The pool will manage connections automatically
   }
 }
 
