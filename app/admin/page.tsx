@@ -80,6 +80,8 @@ export default function AdminPage() {
   const [loanActionLoading, setLoanActionLoading] = useState<string | null>(null)
   const [loanActionError, setLoanActionError] = useState<string | null>(null)
   const [loanActionSuccess, setLoanActionSuccess] = useState<string | null>(null)
+  const [selectedLoan, setSelectedLoan] = useState<any>(null)
+  const [showLoanDetails, setShowLoanDetails] = useState(false)
 
   useEffect(() => {
     if (!loading && (!user || user.role !== "admin")) {
@@ -164,6 +166,19 @@ export default function AdminPage() {
       setLoanActionError("Failed to update loan status")
     } finally {
       setLoanActionLoading(null)
+    }
+  }
+
+  const handleViewLoanDetails = async (loanId: string) => {
+    try {
+      const res = await fetch(`/api/admin/loans/${loanId}`)
+      const data = await res.json()
+      if (data.success) {
+        setSelectedLoan(data.data)
+        setShowLoanDetails(true)
+      }
+    } catch (e) {
+      console.error("Failed to fetch loan details:", e)
     }
   }
 
@@ -898,7 +913,7 @@ export default function AdminPage() {
                         <tr>
                           <th className="px-3 py-2 border">Customer</th>
                           <th className="px-3 py-2 border">Email</th>
-                          <th className="px-3 py-2 border">Amount</th>
+                          <th className="px-3 py-2 border">Amount (XAF)</th>
                           <th className="px-3 py-2 border">Purpose</th>
                           <th className="px-3 py-2 border">Submitted</th>
                           <th className="px-3 py-2 border">Actions</th>
@@ -916,6 +931,9 @@ export default function AdminPage() {
                               <td className="border px-3 py-2">{loan.purpose}</td>
                               <td className="border px-3 py-2">{new Date(loan.createdAt).toLocaleString()}</td>
                               <td className="border px-3 py-2 flex gap-2">
+                                <Button size="sm" variant="outline" onClick={() => handleViewLoanDetails(loan.id)}>
+                                  View Details
+                                </Button>
                                 <Button size="sm" className="bg-green-600 hover:bg-green-700" disabled={loanActionLoading === loan.id + "-approve"} onClick={() => handleLoanAction(loan.id, true)}>
                                   {loanActionLoading === loan.id + "-approve" ? "Approving..." : "Approve"}
                                 </Button>
@@ -935,6 +953,113 @@ export default function AdminPage() {
           </TabsContent>
         </Tabs>
       </div>
+
+      {/* Loan Details Dialog */}
+      <Dialog open={showLoanDetails} onOpenChange={setShowLoanDetails}>
+        <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Loan Application Details</DialogTitle>
+            <DialogDescription>
+              Review loan application and supporting documents
+            </DialogDescription>
+          </DialogHeader>
+          
+          {selectedLoan && (
+            <div className="space-y-6">
+              {/* Loan Information */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <Label className="text-sm font-medium">Customer Name</Label>
+                  <p className="text-lg font-semibold">{selectedLoan.customerName}</p>
+                </div>
+                <div>
+                  <Label className="text-sm font-medium">Customer Email</Label>
+                  <p className="text-sm text-muted-foreground">{selectedLoan.customerEmail}</p>
+                </div>
+                <div>
+                                          <Label className="text-sm font-medium">Loan Amount (XAF)</Label>
+                  <p className="text-lg font-semibold">{selectedLoan.amount} XAF</p>
+                </div>
+                <div>
+                  <Label className="text-sm font-medium">Application Date</Label>
+                  <p className="text-sm text-muted-foreground">
+                    {new Date(selectedLoan.createdAt).toLocaleDateString()}
+                  </p>
+                </div>
+              </div>
+              
+              <div>
+                <Label className="text-sm font-medium">Loan Purpose</Label>
+                <p className="text-sm text-muted-foreground mt-1">{selectedLoan.purpose}</p>
+              </div>
+
+              {/* Documents */}
+              <div>
+                <Label className="text-sm font-medium">Supporting Documents</Label>
+                <div className="mt-2 space-y-2">
+                  {selectedLoan.documents && selectedLoan.documents.length > 0 ? (
+                    selectedLoan.documents.map((doc: any) => (
+                      <div
+                        key={doc.id}
+                        className="flex items-center justify-between p-3 border rounded-lg"
+                      >
+                        <div className="flex items-center gap-3">
+                          <FileText className="h-4 w-4 text-muted-foreground" />
+                          <div>
+                            <p className="font-medium text-sm">{doc.fileName}</p>
+                            <p className="text-xs text-muted-foreground">
+                              {doc.documentType} • {new Date(doc.uploadedAt).toLocaleDateString()}
+                            </p>
+                          </div>
+                        </div>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => window.open(`/api/loans/documents/${doc.id}`, "_blank")}
+                        >
+                          View Document
+                        </Button>
+                      </div>
+                    ))
+                  ) : (
+                    <p className="text-sm text-muted-foreground">No documents uploaded</p>
+                  )}
+                </div>
+              </div>
+
+              {/* Action Buttons */}
+              <div className="flex justify-end gap-2 pt-4 border-t">
+                <Button
+                  variant="outline"
+                  onClick={() => setShowLoanDetails(false)}
+                >
+                  Close
+                </Button>
+                <Button
+                  className="bg-green-600 hover:bg-green-700"
+                  disabled={loanActionLoading === selectedLoan.id + "-approve"}
+                  onClick={() => {
+                    handleLoanAction(selectedLoan.id, true);
+                    setShowLoanDetails(false);
+                  }}
+                >
+                  {loanActionLoading === selectedLoan.id + "-approve" ? "Approving..." : "Approve Loan"}
+                </Button>
+                <Button
+                  variant="destructive"
+                  disabled={loanActionLoading === selectedLoan.id + "-reject"}
+                  onClick={() => {
+                    handleLoanAction(selectedLoan.id, false);
+                    setShowLoanDetails(false);
+                  }}
+                >
+                  {loanActionLoading === selectedLoan.id + "-reject" ? "Rejecting..." : "Reject Loan"}
+                </Button>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </>
   )
 }

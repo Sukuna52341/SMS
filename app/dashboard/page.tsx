@@ -8,7 +8,7 @@ import { useAuth } from "@/lib/auth-context"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Button } from "@/components/ui/button"
-import { Shield, Users, FileText, BookOpen, User, Settings, Bell, Activity, LogOut } from "lucide-react"
+import { Shield, Users, FileText, BookOpen, User, Settings, Bell, Activity, LogOut, DollarSign } from "lucide-react"
 import Link from "next/link"
 import Navbar from "@/components/navbar"
 
@@ -223,6 +223,18 @@ export default function Dashboard() {
               {user.role === "customer" && (
                 <>
                   <QuickAccessCard
+                    icon={<DollarSign className="h-6 w-6 text-green-500" />}
+                    title="Apply for Loan"
+                    description="Submit a new loan application with documents"
+                    link="/apply-loan"
+                  />
+                  <QuickAccessCard
+                    icon={<FileText className="h-6 w-6 text-green-500" />}
+                    title="My Loan Applications"
+                    description="View status of your loan applications"
+                    link="/my-loans"
+                  />
+                  <QuickAccessCard
                     icon={<User className="h-6 w-6 text-green-500" />}
                     title="My Profile"
                     description="View and update your personal information"
@@ -294,14 +306,24 @@ export default function Dashboard() {
                 </Button>
               )}
               {user.role === "customer" && (
-                <Button
-                  variant="outline"
-                  className="h-24 flex flex-col items-center justify-center gap-2"
-                  onClick={() => router.push(quickAccessRoutes["Privacy"])}
-                >
-                  <Shield className="h-6 w-6" />
-                  <span>Privacy</span>
-                </Button>
+                <>
+                  <Button
+                    variant="outline"
+                    className="h-24 flex flex-col items-center justify-center gap-2"
+                    onClick={() => router.push("/my-loans")}
+                  >
+                    <FileText className="h-6 w-6" />
+                    <span>My Loans</span>
+                  </Button>
+                  <Button
+                    variant="outline"
+                    className="h-24 flex flex-col items-center justify-center gap-2"
+                    onClick={() => router.push(quickAccessRoutes["Privacy"])}
+                  >
+                    <Shield className="h-6 w-6" />
+                    <span>Privacy</span>
+                  </Button>
+                </>
               )}
             </div>
           </TabsContent>

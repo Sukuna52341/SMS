@@ -29,6 +29,7 @@ export async function POST(request: NextRequest) {
       secret: user.twofa_secret,
       encoding: "base32",
       token: code,
+      window: 1, // Allow 1 time-step before/after for clock drift
     })
 
     if (!verified) {

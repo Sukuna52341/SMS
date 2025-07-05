@@ -634,7 +634,7 @@ export default function CustomersPage() {
                       id="loanAmount"
                       name="loanAmount"
                       type="number"
-                      placeholder="Enter loan amount"
+                                              placeholder="Enter loan amount in XAF"
                       value={newCustomerData.loanAmount || ""}
                       onChange={handleNumberInputChange}
                     />
@@ -754,7 +754,7 @@ export default function CustomersPage() {
                           <p className="text-sm font-medium text-gray-500 dark:text-gray-400">Loan Amount</p>
                           <p className="dark:text-white">
                             {selectedCustomer.loanAmount !== null && selectedCustomer.loanAmount !== undefined
-                              ? `$${selectedCustomer.loanAmount.toLocaleString()}`
+                              ? `${selectedCustomer.loanAmount.toLocaleString()} XAF`
                               : 'N/A'}
                           </p>
                         </div>
@@ -890,7 +890,7 @@ export default function CustomersPage() {
             <CardContent>
               <form onSubmit={handleLoanSubmit} className="space-y-4">
                 <div>
-                  <label className="block text-sm font-medium mb-1">Amount</label>
+                  <label className="block text-sm font-medium mb-1">Amount (XAF)</label>
                   <Input name="amount" type="number" value={loanForm.amount} onChange={handleLoanInputChange} required />
                 </div>
                 <div>
@@ -918,7 +918,7 @@ export default function CustomersPage() {
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead>Amount</TableHead>
+                    <TableHead>Amount (XAF)</TableHead>
                     <TableHead>Purpose</TableHead>
                     <TableHead>Status</TableHead>
                     <TableHead>Submitted</TableHead>

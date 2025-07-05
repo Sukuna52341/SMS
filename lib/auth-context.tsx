@@ -15,6 +15,7 @@ export interface User {
 interface AuthContextType {
   user: User | null
   login: (email: string, password: string) => Promise<boolean>
+  verify2fa: (code: string) => Promise<boolean>
   signup: (name: string, email: string, password: string, role: string) => Promise<boolean>
   logout: () => void
   loading: boolean
@@ -94,10 +95,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         body: JSON.stringify({ email, password }),
       })
       const data = await response.json()
-      if (response.ok && data.user) {
-        setUser(data.user)
-        localStorage.setItem("user", JSON.stringify(data.user))
-        return true
+      
+      if (response.ok) {
+        if (data.require2fa) {
+          // 2FA is required, store email for 2FA verification
+          localStorage.setItem("pending2fa_email", email)
+          return true // Return true to indicate 2FA is needed
+        } else if (data.user) {
+          // Normal login successful
+          setUser(data.user)
+          localStorage.setItem("user", JSON.stringify(data.user))
+          return true
+        }
       }
       return false
     } catch (error) {
@@ -143,9 +152,41 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }
 
+  const verify2fa = async (code: string): Promise<boolean> => {
+    setLoading(true)
+    try {
+      const email = localStorage.getItem("pending2fa_email")
+      if (!email) {
+        return false
+      }
+
+      const response = await fetch("/api/auth/verify-2fa", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email, code }),
+      })
+      
+      const data = await response.json()
+      
+      if (response.ok && data.user) {
+        setUser(data.user)
+        localStorage.setItem("user", JSON.stringify(data.user))
+        localStorage.removeItem("pending2fa_email") // Clean up
+        return true
+      }
+      return false
+    } catch (error) {
+      console.error("2FA verification error:", error)
+      return false
+    } finally {
+      setLoading(false)
+    }
+  }
+
   const logout = () => {
     setUser(null)
     localStorage.removeItem("user")
+    localStorage.removeItem("pending2fa_email") // Clean up 2FA pending state
     router.push("/")
   }
 
@@ -159,7 +200,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   return (
     <AuthContext.Provider
-      value={{ user, login, signup, logout, loading, getAccessToken }}
+      value={{ user, login, verify2fa, signup, logout, loading, getAccessToken }}
     >
       {children}
     </AuthContext.Provider>

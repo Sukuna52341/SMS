@@ -80,3 +80,22 @@ export function decryptLoanPurpose(encrypted: Buffer | string): string {
   const decrypted = Buffer.concat([decipher.update(encryptedText), decipher.final()]);
   return decrypted.toString();
 }
+
+// Generic encryption/decryption functions for files and other data
+export async function encrypt(data: Buffer): Promise<Buffer> {
+  const iv = crypto.randomBytes(IV_LENGTH);
+  const cipher = crypto.createCipheriv('aes-256-cbc', ENCRYPTION_KEY, iv);
+  const encrypted = Buffer.concat([cipher.update(data), cipher.final()]);
+  return Buffer.concat([iv, encrypted]);
+}
+
+export async function decrypt(encrypted: Buffer): Promise<Buffer> {
+  if (!encrypted || encrypted.length <= IV_LENGTH) {
+    throw new Error("Invalid encrypted data");
+  }
+  const iv = encrypted.slice(0, IV_LENGTH);
+  const encryptedData = encrypted.slice(IV_LENGTH);
+  const decipher = crypto.createDecipheriv('aes-256-cbc', ENCRYPTION_KEY, iv);
+  const decrypted = Buffer.concat([decipher.update(encryptedData), decipher.final()]);
+  return decrypted;
+}

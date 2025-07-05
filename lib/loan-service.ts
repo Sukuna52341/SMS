@@ -76,6 +76,40 @@ export async function getAllPendingLoansWithCustomer(): Promise<any[]> {
   return rows;
 }
 
+export async function getLoanWithDocuments(loanId: string): Promise<any> {
+  // Get loan details with customer info
+  const loanRows = await executeQuery<any[]>(
+    `SELECT loans.*, customers.name AS customer_name, users.email AS customer_email
+     FROM loans
+     JOIN customers ON loans.customer_id = customers.id
+     JOIN users ON customers.user_id = users.id
+     WHERE loans.id = ?`,
+    [loanId]
+  );
+
+  if (loanRows.length === 0) {
+    return null;
+  }
+
+  const loan = loanRows[0];
+
+  // Get documents for this loan
+  const { getDocumentsByLoanId } = await import("./document-service");
+  const documents = await getDocumentsByLoanId(loanId);
+
+  return {
+    ...loan,
+    documents: documents.map(doc => ({
+      id: doc.id,
+      documentType: doc.document_type,
+      fileName: doc.file_name,
+      fileSize: doc.file_size,
+      mimeType: doc.mime_type,
+      uploadedAt: doc.uploaded_at
+    }))
+  };
+}
+
 export async function getCustomerIdByLoanId(loanId: string): Promise<string | null> {
   const rows = await executeQuery<any[]>(
     `SELECT customer_id FROM loans WHERE id = ?`,

@@ -50,6 +50,19 @@ CREATE TABLE IF NOT EXISTS loans (
   FOREIGN KEY (customer_id) REFERENCES customers(id) ON DELETE CASCADE
 );
 
+-- Loan documents table
+CREATE TABLE IF NOT EXISTS loan_documents (
+  id VARCHAR(36) PRIMARY KEY,
+  loan_id VARCHAR(36) NOT NULL,
+  document_type ENUM('government_id', 'income_proof', 'collateral_document', 'bank_statement', 'other') NOT NULL,
+  file_name VARCHAR(255) NOT NULL,
+  file_size INT NOT NULL,
+  mime_type VARCHAR(100) NOT NULL,
+  file_data_encrypted LONGBLOB NOT NULL,
+  uploaded_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (loan_id) REFERENCES loans(id) ON DELETE CASCADE
+);
+
 -- Audit logs table
 CREATE TABLE IF NOT EXISTS audit_logs (
   id VARCHAR(36) PRIMARY KEY,

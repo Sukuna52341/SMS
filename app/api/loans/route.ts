@@ -4,6 +4,7 @@ import { executeQuery, insertNotification } from "@/lib/db-config";
 import { encryptLoanAmount, encryptLoanPurpose, decryptLoanAmount, decryptLoanPurpose } from "@/lib/encryption-utils";
 import { createAuditLog } from "@/lib/audit-logger";
 import { getCustomerByUserId } from "@/lib/customer-service";
+import { getDocumentsByLoanId } from "@/lib/document-service";
 
 export async function POST(request: NextRequest) {
   const user = await getUserFromRequest(request);
@@ -20,17 +21,21 @@ export async function POST(request: NextRequest) {
   const amountEncrypted = await encryptLoanAmount(String(amount));
   const purposeEncrypted = await encryptLoanPurpose(String(purpose));
 
+  // Generate loan ID
+  const { generateId } = await import("@/lib/db");
+  const loanId = generateId();
+
   // Save to DB
-  const result: any = await executeQuery(
-    "INSERT INTO loans (id, customer_id, amount_encrypted, purpose_encrypted, status) VALUES (UUID(), ?, ?, ?, 'pending')",
-    [customer.id, amountEncrypted, purposeEncrypted]
+  await executeQuery(
+    "INSERT INTO loans (id, customer_id, amount_encrypted, purpose_encrypted, status) VALUES (?, ?, ?, ?, 'pending')",
+    [loanId, customer.id, amountEncrypted, purposeEncrypted]
   );
 
   // Audit log
   await createAuditLog({
     action: "APPLY_LOAN",
     resourceType: "LOAN",
-    resourceId: result.insertId || "unknown",
+    resourceId: loanId,
     userId: user.id,
     userName: user.name,
     userRole: user.role,
@@ -42,7 +47,7 @@ export async function POST(request: NextRequest) {
   // Send notification to customer
   await insertNotification(user.id, `Your loan application for ${amount} XAF has been submitted and is under review.`);
 
-  return NextResponse.json({ success: true });
+  return NextResponse.json({ success: true, loanId });
 }
 
 export async function GET(request: NextRequest) {
@@ -55,10 +60,10 @@ export async function GET(request: NextRequest) {
   if (!customer) return NextResponse.json({ success: false, error: "Customer record not found" }, { status: 404 });
 
   const loans: any[] = await executeQuery(
-    "SELECT id, amount_encrypted, purpose_encrypted, status, created_at FROM loans WHERE customer_id = ?",
+    "SELECT id, amount_encrypted, purpose_encrypted, status, created_at, updated_at, approved_by, approved_at FROM loans WHERE customer_id = ? ORDER BY created_at DESC",
     [customer.id]
   );
-  const decryptedLoans = loans.map((loan: any) => {
+  const decryptedLoans = await Promise.all(loans.map(async (loan: any) => {
     let amount = null;
     let purpose = null;
     try {
@@ -85,6 +90,10 @@ export async function GET(request: NextRequest) {
     } catch {
       purpose = null;
     }
+
+    // Fetch documents for this loan
+    const documents = await getDocumentsByLoanId(loan.id);
+
     // Log the decrypted values
     console.log('Decrypted loan:', { id: loan.id, amount, purpose });
     return {
@@ -93,7 +102,11 @@ export async function GET(request: NextRequest) {
       purpose,
       status: loan.status,
       createdAt: loan.created_at,
+      updatedAt: loan.updated_at,
+      approvedBy: loan.approved_by,
+      approvedAt: loan.approved_at,
+      documents,
     };
-  });
+  }));
   return NextResponse.json({ success: true, data: decryptedLoans });
 }

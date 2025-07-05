@@ -1,8 +1,6 @@
 "use client"
 
-import type React from "react"
-
-import { useState } from "react"
+import React, { useState } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
 import { useAuth } from "@/lib/auth-context"
 import { Button } from "@/components/ui/button"
@@ -21,8 +19,17 @@ export default function LoginPage() {
   const [show2FA, setShow2FA] = useState(false)
   const [twoFACode, setTwoFACode] = useState("")
   const [isVerifying2FA, setIsVerifying2FA] = useState(false)
-  const { login } = useAuth()
+  const { login, verify2fa } = useAuth()
   const router = useRouter()
+
+  // Check if there's a pending 2FA session
+  React.useEffect(() => {
+    const pendingEmail = localStorage.getItem("pending2fa_email")
+    if (pendingEmail) {
+      setEmail(pendingEmail)
+      setShow2FA(true)
+    }
+  }, [])
 
   const searchParams = useSearchParams()
   const justRegistered = searchParams.get("registered") === "true"
@@ -47,6 +54,7 @@ export default function LoginPage() {
 
       if (data.require2fa) {
         setShow2FA(true)
+        localStorage.setItem("pending2fa_email", email) // <-- Fix: store email for 2FA
         setIsLoading(false)
         return
       }
@@ -82,31 +90,24 @@ export default function LoginPage() {
     setIsVerifying2FA(true)
 
     try {
-      const response = await fetch("/api/auth/verify-2fa", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, code: twoFACode }),
-        credentials: "include", // <-- Ensure cookie is stored
-      })
-
-      const data = await response.json()
-
-      if (!response.ok) {
-        throw new Error(data.error || "Invalid 2FA code")
-      }
-
-      // Store user data in localStorage
-      localStorage.setItem("user", JSON.stringify(data.user))
-
-      // 2FA verification successful, proceed with login
-      if (data.user.role === "admin") {
-        router.push("/admin")
-      } else if (data.user.role === "staff") {
-        router.push("/dashboard")
-      } else if (data.user.role === "customer") {
-        router.push("/dashboard")
+      const success = await verify2fa(twoFACode)
+      
+      if (success) {
+        // Get user data from localStorage (set by verify2fa)
+        const user = JSON.parse(localStorage.getItem("user") || '{}')
+        
+        // Redirect based on role
+        if (user.role === "admin") {
+          router.push("/admin")
+        } else if (user.role === "staff") {
+          router.push("/dashboard")
+        } else if (user.role === "customer") {
+          router.push("/dashboard")
+        } else {
+          router.push("/dashboard")
+        }
       } else {
-        router.push("/dashboard")
+        setError("Invalid 2FA code. Please try again.")
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : "An error occurred during 2FA verification")
